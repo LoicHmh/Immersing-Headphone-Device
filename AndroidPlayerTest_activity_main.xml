@@ -1,3 +1,5 @@
+# android studio 使用mediaplayer播放音乐（一个按钮） 
+## 界面程序activity_main.xml
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -15,3 +17,4 @@
         android:layout_weight="4"
         android:text="播放"/>
 </LinearLayout>
+
