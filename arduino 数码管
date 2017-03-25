@@ -1,0 +1,225 @@
+#include <pt.h>
+static int counter1=0,distance,counter2=0,px=0;
+static struct pt pt1,pt2;
+const int trig = A3;
+const int echo = A1;
+const int buttonp = A2;
+const int soundp = A4;
+unsigned long previousMillis;
+unsigned long currentMillis;
+unsigned long ct;
+unsigned long pt;
+int button = 0;
+long duration;
+int soundstate = LOW;
+unsigned long temp;
+//数码管
+#define d_a 3  //定义数码管a 接引脚 2
+#define d_b 10
+#define d_c 11
+#define d_d 6
+#define d_e 5
+#define d_f 4
+#define d_g 12
+#define d_h 7
+
+#define COM1 2   //定义 第一组数码管 com1 接引脚2
+#define COM2 8
+#define COM3 9
+#define COM4 13
+//数码管0-F码值
+unsigned char num[17][8] =
+{
+ //a  b  c  d  e  f  g  h 
+  {1, 1, 1, 1, 1, 1, 0, 0},     //0
+  {0, 1, 1, 0, 0, 0, 0, 0},     //1
+  {1, 1, 0, 1, 1, 0, 1, 0},     //2
+  {1, 1, 1, 1, 0, 0, 1, 0},     //3
+  {0, 1, 1, 0, 0, 1, 1, 0},     //4
+  {1, 0, 1, 1, 0, 1, 1, 0},     //5
+  {1, 0, 1, 1, 1, 1, 1, 0},     //6
+  {1, 1, 1, 0, 0, 0, 0, 0},     //7
+  {1, 1, 1, 1, 1, 1, 1, 0},     //8
+  {1, 1, 1, 1, 0, 1, 1, 0},     //9
+  {1, 1, 1, 0, 1, 1, 1, 1},     //A
+  {1, 1, 1, 1, 1, 1, 1, 1},     //B
+  {1, 0, 0, 1, 1, 1, 0, 1},     //C
+  {1, 1, 1, 1, 1, 1, 0, 1},     //D
+  {1, 0, 0, 1, 1, 1, 1, 1},     //E
+  {1, 0, 0, 0, 1, 1, 1, 1},     //F
+  {0, 0, 0, 0, 0, 0, 0, 1},     //.
+};
+static int protothread1(struct pt *pt)
+{
+  PT_BEGIN(pt);
+  while(1)
+  {
+    PT_WAIT_UNTIL(pt,(counter1>=1)&&(distance<450));
+    counter1=0;
+    show(distance);
+  }
+  PT_END(pt);
+}
+static int protothread2(struct pt *pt)
+{
+  PT_BEGIN(pt);
+  while(1)
+  {
+    PT_WAIT_UNTIL(pt,counter2 == 20);
+    Serial.print("pt2,distance=");
+    distance=dis();
+    if (distance<450)
+    {
+      Serial.println(distance);
+      sla();
+    }
+    else
+      counter1=0;
+    counter2=0;
+  }
+  PT_END(pt);
+}
+
+void setup() {
+  previousMillis = 0;
+  Serial.begin(9600);
+  pinMode(buttonp, INPUT_PULLUP);
+  pinMode(trig, OUTPUT);
+  pinMode(echo, INPUT);
+  pinMode(soundp, OUTPUT);
+  digitalWrite(soundp, HIGH);
+  pinMode(d_a,OUTPUT);    //设置为输出引脚
+  pinMode(d_b,OUTPUT);
+  pinMode(d_c,OUTPUT);
+  pinMode(d_d,OUTPUT);
+  pinMode(d_e,OUTPUT);
+  pinMode(d_f,OUTPUT);
+  pinMode(d_g,OUTPUT);
+  pinMode(d_h,OUTPUT);
+
+  pinMode(COM1,OUTPUT);
+  pinMode(COM2,OUTPUT);
+  pinMode(COM3,OUTPUT);
+  pinMode(COM4,OUTPUT);
+  pt=millis();
+  PT_INIT(&pt1);
+  PT_INIT(&pt2);
+}
+
+void loop() {
+  protothread1(&pt1);
+  protothread2(&pt2);
+  counter1++;
+  counter2++;
+
+}
+
+int dis()
+{
+  float dist;
+  float distt;
+  float distd;
+  digitalWrite(trig, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trig, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trig, LOW);
+  dist = pulseIn(echo, HIGH) / 58.00;
+  int reading = analogRead(A0);
+  temp = (reading * 0.0048828125 * 100);
+  distt = dist * temp * 0.000017;
+  distd = dist * 0.9650;
+  distance = distt + distd;
+  return distance;
+}
+
+void sla()
+{
+    if       (distance >= 120)                       duration = 0;
+    else if ((distance >= 80) and (distance < 120))  duration = 800;
+    else if ((distance >= 50) and (distance < 80))   duration = 350;
+    else if ((distance >= 15) and (distance < 50))   duration = 150;
+    else if  (distance < 15)                         duration = 1;
+    currentMillis = millis();
+    if (currentMillis - previousMillis >= duration and duration > 1) 
+    {
+        previousMillis = currentMillis;
+        if (soundstate == LOW) 
+        {
+            soundstate = HIGH;
+        }
+        else 
+        {
+            soundstate = LOW;
+        }
+         if (soundstate == HIGH) 
+         {
+            tone(soundp, 500, duration);
+         }
+         else 
+         {
+            noTone(soundp);
+         }
+    }
+    if (duration == 1) 
+    {
+      tone(soundp, 500, 50 * duration);
+    }
+}
+
+void show(int x)
+{
+  Serial.println(x);
+  
+  if (x>450){x=px;}
+  for (int i=0;i<4;i++)
+  {
+    Display(4-i,x%10);
+    x/=10;
+    delay(2*(4-i));
+  }
+  px=x;
+}
+
+void Display(unsigned char com,unsigned char n)     //显示函数，com可选数值范围1-4，num可选数值范围0-9
+{
+  switch(com)           //选通位选
+  {
+     case 4:
+      digitalWrite(COM1,HIGH);
+      digitalWrite(COM2,HIGH);
+      digitalWrite(COM3,HIGH);
+      digitalWrite(COM4,LOW);   //选择位4
+      break;
+    case 1:
+      digitalWrite(COM1,LOW);   //选择位1
+      digitalWrite(COM2,HIGH);
+      digitalWrite(COM3,HIGH);
+      digitalWrite(COM4,HIGH);
+      break;
+    case 2:
+      digitalWrite(COM1,HIGH);
+      digitalWrite(COM2,LOW);   //选择位2
+      digitalWrite(COM3,HIGH);
+      digitalWrite(COM4,HIGH);
+      break;
+    case 3:
+      digitalWrite(COM1,HIGH);
+      digitalWrite(COM2,HIGH);
+      digitalWrite(COM3,LOW);   //选择位3
+      digitalWrite(COM4,HIGH);
+      break;
+
+    default:break;
+    
+  }
+  
+  digitalWrite(d_a,num[n][0]);      //a查询码值表
+  digitalWrite(d_b,num[n][1]);
+  digitalWrite(d_c,num[n][2]);
+  digitalWrite(d_d,num[n][3]);
+  digitalWrite(d_e,num[n][4]);
+  digitalWrite(d_f,num[n][5]);
+  digitalWrite(d_g,num[n][6]);
+  digitalWrite(d_h,num[n][7]);
+}
